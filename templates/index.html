@@ -16,35 +16,23 @@
             <div id="result"></div>
 
             <h2>車牌辨識紀錄</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>車牌圖片</th>
-                        <th>檔案名稱</th>
-                        <th>車牌號碼</th>
-                        <th>時間</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for record in records %}
-                    <tr>
-                        <td>
-                            <img
-                                src="{{ url_for('static', filename='uploads/' + record[1]) }}"
-                                alt="車牌圖片"
-                                width="500"
-                                height="300"
-                            />
-                        </td>
-                        <td>{{ record[1] }}</td>
-                        <!-- filename -->
-                        <td>{{ record[2] }}</td>
-                        <!-- plate_number -->
-                        <td>{{ record[3] }}</td>
-                        <!-- timestamp -->
-                    </tr>
-                    {% endfor %}
-                </tbody>
+            <table border="1">
+                <tr>
+                    <th>ID</th>
+                    <th>圖片</th>
+                    <th>車牌號碼</th>
+                    <th>時間</th>
+                    <th>操作</th>
+                </tr>
+                {% for record in records %}
+                <tr id="record-{{ record[0] }}">
+                    <td>{{ record[0] }}</td>
+                    <td><img src="{{ url_for('static', filename='uploads/' + record[1]) }}" width="100" /></td>
+                    <td>{{ record[2] }}</td>
+                    <td>{{ record[3] }}</td>
+                    <td><button onclick="deleteRecord({{ record[0] }})">刪除</button></td>
+                </tr>
+                {% endfor %}
             </table>
         </div>
 
@@ -78,6 +66,22 @@
                         document.getElementById('result').innerText = '上傳失敗：' + error.message
                     })
             })
+
+            function deleteRecord(recordId) {
+                if (!confirm('確定要刪除此紀錄嗎？')) {
+                    return
+                }
+
+                fetch(`/delete/${recordId}`, {
+                    method: 'POST',
+                })
+                    .then((response) => response.json())
+                    .then((data) => {
+                        alert(data.message)
+                        document.getElementById(`record-${recordId}`).remove() // 刪除前端畫面上的表格列
+                    })
+                    .catch((error) => console.error('Error:', error))
+            }
         </script>
     </body>
 </html>

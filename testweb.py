@@ -7,7 +7,7 @@ from datetime import datetime
 app = Flask(__name__)
 
 # 設定圖片上傳資料夾
-UPLOAD_FOLDER = 'uploads'
+UPLOAD_FOLDER = './uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # 確保上傳資料夾存在
@@ -85,6 +85,34 @@ def upload_file():
             'plate_number': plate_number,
             'filename': filename
         })
+
+# 刪除紀錄
+
+
+@app.route('/delete/<int:record_id>', methods=['POST'])
+def delete_record(record_id):
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+
+    # 找到該筆資料的圖片檔案名稱
+    cursor.execute("SELECT filename FROM records WHERE id = ?", (record_id,))
+    record = cursor.fetchone()
+
+    if record:
+        filename = record[0]
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+        # 刪除對應圖片檔案（如果存在）
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+        # 從資料庫刪除記錄
+        cursor.execute("DELETE FROM records WHERE id = ?", (record_id,))
+        conn.commit()
+
+    conn.close()
+    return jsonify({'message': 'Record deleted successfully'})
+
 # 顯示辨識紀錄
 
 
