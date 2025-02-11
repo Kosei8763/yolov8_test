@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>車牌辨識系統</title>
+        <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    </head>
+    <body>
+        <div class="container">
+            <h1>車牌辨識系統</h1>
+            <form id="uploadForm">
+                <input type="file" id="fileInput" accept="image/*" />
+                <button type="submit">上傳圖片</button>
+            </form>
+            <div id="result"></div>
+
+            <h2>車牌辨識紀錄</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>車牌圖片</th>
+                        <th>檔案名稱</th>
+                        <th>車牌號碼</th>
+                        <th>時間</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in records %}
+                    <tr>
+                        <td>
+                            <img
+                                src="{{ url_for('static', filename='uploads/' + record[1]) }}"
+                                alt="車牌圖片"
+                                width="500"
+                                height="300"
+                            />
+                        </td>
+                        <td>{{ record[1] }}</td>
+                        <!-- filename -->
+                        <td>{{ record[2] }}</td>
+                        <!-- plate_number -->
+                        <td>{{ record[3] }}</td>
+                        <!-- timestamp -->
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <script>
+            document.getElementById('uploadForm').addEventListener('submit', function (event) {
+                event.preventDefault()
+                let fileInput = document.getElementById('fileInput').files[0]
+                let formData = new FormData()
+                formData.append('file', fileInput)
+
+                fetch('/upload', {
+                    method: 'POST',
+                    body: formData,
+                })
+                    .then((response) => response.json())
+                    .then((data) => {
+                        if (data.error) {
+                            document.getElementById('result').innerText = '錯誤：' + data.error
+                        } else {
+                            // 顯示車牌號碼
+                            document.getElementById('result').innerText = '車牌號碼：' + data.plate_number
+
+                            // 顯示圖片
+                            const img = document.createElement('img')
+                            img.src = "{{ url_for('static', filename='../uploads/') }}" + data.filename
+                            img.width = 100
+                            document.getElementById('result').appendChild(img)
+                        }
+                    })
+                    .catch((error) => {
+                        document.getElementById('result').innerText = '上傳失敗：' + error.message
+                    })
+            })
+        </script>
+    </body>
+</html>
