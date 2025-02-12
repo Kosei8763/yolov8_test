@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>計算停車費用</title>
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+        <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    </head>
+    <body>
+        <h1>計算停車費用</h1>
+
+        <input type="text" id="fee-plate" placeholder="輸入車牌號碼" />
+        <button onclick="calculateFee()">計算費用</button>
+
+        <h2 id="fee-result"></h2>
+
+        <a href="/">返回首頁</a>
+
+        <script src="{{ url_for('static', filename='calculate_fee.js') }}"></script>
+    </body>
+</html>
