@@ -6,6 +6,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from datetime import datetime
 from ultralytics import YOLO
+import torch
 
 app = Flask(__name__)
 
@@ -45,11 +46,28 @@ model = YOLO("best.pt")  # 替換成你的模型權重檔案
 
 
 def recognize_plate_yolo(image_path):
-    # 讀取影像
-    image = cv2.imread(image_path)
+    # 讀取圖片
+    img = cv2.imread(image_path)
+    if img is None:
+        print("Error: 無法讀取圖片")
+        return
 
-    # 使用 YOLO 偵測車牌字元
-    results = model(image)
+    # 轉換為 BGR 格式
+    img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+
+    # 調整圖片大小為 640x640
+    img_resized = cv2.resize(img_bgr, (640, 640))
+
+    # 添加 batch 維度
+    img_input = np.expand_dims(img_resized, axis=0)
+
+    # 將圖片轉換為 Tensor
+    img_input = torch.from_numpy(img_input).float() / 255.0  # 正規化
+    # 將圖像維度從 (batch, height, width, channels) 轉換為 (batch, channels, height, width)
+    img_input = img_input.permute(0, 3, 1, 2)
+
+    # 使用 YOLO 模型進行預測
+    results = model(img_input)
 
     detected_chars = []  # 儲存 (字元, x1) 位置
 

@@ -92,7 +92,7 @@ function vehicleExit(recordId) {
         url: "/exit/" + recordId,
         method: "POST",
         success: function(response) {
-            alert("車輛已離場，停車費用：" + response.fee + " 元");
+            alert("車輛已離場，停車費用：" + response.record.fee + " 元");
             loadRecords();  // 重新載入紀錄
         },
         error: function() {
