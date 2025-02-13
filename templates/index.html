@@ -14,6 +14,16 @@
         <p id="yolo-recognized-plate"></p>
         <h1>停車場管理系統</h1>
 
+        <h2>手機車牌偵測</h2>
+        <video id="video" autoplay playsinline></video>
+        <button onclick="captureImage()">拍攝車牌</button>
+
+        <canvas id="canvas" style="display: none"></canvas>
+
+        <p id="yolo-recognized-plate">等待偵測...</p>
+        <input type="text" id="entry-plate" placeholder="輸入車牌號碼" />
+        <button onclick="vehicleEntry()">車輛進場</button>
+
         <!-- 進場表單 -->
         <h2>車輛進場</h2>
         <input type="text" id="entry-plate" placeholder="輸入車牌號碼" />

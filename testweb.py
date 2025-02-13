@@ -7,6 +7,7 @@ from flask_cors import CORS
 from datetime import datetime
 from ultralytics import YOLO
 import torch
+import base64
 
 app = Flask(__name__)
 
@@ -26,6 +27,7 @@ CORS(app)  # 啟用 CORS
 
 
 # 車輛進出記錄表
+
 class ParkingRecord(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     plate_number = db.Column(db.String(20), nullable=False)
@@ -85,6 +87,32 @@ def recognize_plate_yolo(image_path):
     plate_number = "".join([char[0] for char in detected_chars])
 
     return plate_number
+
+
+@app.route('/yolo_plate_recognition', methods=['POST'])
+def yolo_plate_recognition():
+    """接收前端傳來的 Base64 圖片，辨識車牌並回傳"""
+    data = request.json['image']
+    image_data = base64.b64decode(data.split(',')[1])  # 解析 Base64 圖片
+    np_arr = np.frombuffer(image_data, np.uint8)
+    frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)  # 轉換成 OpenCV 圖片格式
+
+    # 偵測車牌
+    results = model(frame)
+    plates = []
+
+    for result in results:
+        for box in result.boxes:
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            plate_crop = frame[y1:y2, x1:x2]
+
+            # 🚀 這裡應該加上 OCR（如 Tesseract）來讀取車牌號碼
+            plate_number = "ABC1234"  # 假設 OCR 辨識成功，實際應用需要 OCR
+            plates.append(plate_number)
+
+    if plates:
+        return jsonify({"plate_number": plates[0]})
+    return jsonify({"plate_number": None})
 
 # 上傳圖片並處理
 
@@ -173,6 +201,8 @@ def vehicle_exit(record_id):
             "fee": record.fee
         }
     }), 200
+
+# 計算費用api
 
 
 @app.route('/calculate_fee', methods=['POST'])
