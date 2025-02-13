@@ -114,25 +114,6 @@ def yolo_plate_recognition():
         return jsonify({"plate_number": plates[0]})
     return jsonify({"plate_number": None})
 
-# 上傳圖片並處理
-
-
-@app.route('/yolo_plate_recognition', methods=['POST'])
-def recognize_plate_api():
-    if 'file' not in request.files:
-        return jsonify({"error": "未提供影像檔案"}), 400
-
-    file = request.files['file']
-    file_path = "uploads/temp.jpg"
-    file.save(file_path)
-
-    plate_number = recognize_plate_yolo(file_path)
-
-    if plate_number:
-        return jsonify({"plate_number": plate_number})
-    else:
-        return jsonify({"error": "未辨識到車牌"}), 400
-
 
 @app.route('/')
 def home():

@@ -35,33 +35,6 @@ function loadRecords() {
     })
 }
 
-// 上傳 YOLO 車牌圖片並辨識
-function uploadYoloPlateImage() {
-    let fileInput = document.getElementById('yolo-plate-image')
-    if (fileInput.files.length === 0) {
-        alert('請選擇一張車牌圖片！')
-        return
-    }
-
-    let formData = new FormData()
-    formData.append('file', fileInput.files[0])
-
-    fetch('/yolo_plate_recognition', {
-        method: 'POST',
-        body: formData,
-    })
-        .then((response) => response.json())
-        .then((data) => {
-            if (data.plate_number) {
-                document.getElementById('yolo-recognized-plate').innerText = '辨識車牌：' + data.plate_number
-                document.getElementById('entry-plate').value = data.plate_number
-            } else {
-                alert('未能成功辨識車牌')
-            }
-        })
-        .catch(() => alert('上傳失敗'))
-}
-
 // 進場請求
 function vehicleEntry() {
     let plateNumber = $('#entry-plate').val()

@@ -8,12 +8,6 @@
         <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
     </head>
     <body>
-        <h2>YOLO 車牌辨識</h2>
-        <input type="file" id="yolo-plate-image" />
-        <button onclick="uploadYoloPlateImage()">辨識車牌</button>
-        <p id="yolo-recognized-plate"></p>
-        <h1>停車場管理系統</h1>
-
         <h2>手機車牌偵測</h2>
         <video id="video" autoplay playsinline></video>
         <button onclick="captureImage()">拍攝車牌</button>
