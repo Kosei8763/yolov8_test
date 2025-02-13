@@ -42,7 +42,7 @@ with app.app_context():
 
 
 # 加載 YOLOv8 訓練好的模型
-model = YOLO("best.pt")  # 替換成你的模型權重檔案
+model = YOLO("car_plate.pt")  # 替換成你的模型權重檔案
 
 # 使用 YOLO 偵測車牌並辨識車牌號碼
 
