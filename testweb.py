@@ -55,8 +55,8 @@ def recognize_plate_yolo(image_path):
     # 轉換為 BGR 格式
     img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
-    # 調整圖片大小為 640x640
-    img_resized = cv2.resize(img_bgr, (640, 640))
+    # 調整圖片大小為 320x320
+    img_resized = cv2.resize(img_bgr, (320, 320))
 
     # 添加 batch 維度
     img_input = np.expand_dims(img_resized, axis=0)
