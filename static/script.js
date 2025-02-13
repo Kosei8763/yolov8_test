@@ -1,38 +1,42 @@
-function loadRecords() {
-    $.get('/records', function (data) {
-        let tableBody = $('#records-table')
-        tableBody.empty() // 清空表格內容
+const socket = io.connect('http://127.0.0.1:5000')
 
-        if (data.length === 0) {
-            tableBody.append(`<tr><td colspan="7">目前沒有紀錄</td></tr>`)
-            return
-        }
+socket.on('connect', function () {
+    console.log('✅ WebSocket 已連線')
+})
 
-        data.forEach((record) => {
-            // 確保 exit_time 和 fee 有正確值
-            let exitTime = record.exit_time ? new Date(record.exit_time).toLocaleString() : '尚未離場'
-            let fee = record.fee ? record.fee.toFixed(2) + ' 元' : '尚未計費'
+socket.on('update_records', function (data) {
+    console.log('📢 收到新紀錄更新')
+    updateRecordsTable(data)
+})
 
-            // 動態生成表格行
-            tableBody.append(`
-                <tr id="record-${record.id}">
-                    <td>${record.id}</td>
-                    <td>${record.plate_number}</td>
-                    <td>${new Date(record.entry_time).toLocaleString()}</td>
-                    <td>${exitTime}</td>
-                    <td>${fee}</td>
-                    <td>
-                        ${!record.exit_time ? `<button onclick="vehicleExit(${record.id})">離場</button>` : ''}
-                    </td>  
-                    <td>  
-                        <button onclick="deleteRecord(${record.id})">刪除</button>
-                    </td>
-                </tr>
-            `)
+function updateRecordsTable(records) {
+    const tableBody = document.getElementById('records-table') // 確保這是您表格的正確 ID
+    tableBody.innerHTML = '' // 清空表格
+
+    // 檢查 records 是否為陣列並且包含資料
+    if (Array.isArray(records) && records.length > 0) {
+        records.forEach((record) => {
+            const row = document.createElement('tr')
+            row.id = 'record-' + record.id // 設置唯一 ID 以便刪除
+
+            const imageElement = record.plate_number
+                ? `<img src="static/plates/${record.plate_number}.jpg" alt="車輛圖片" width="100" height="auto">`
+                : '無圖片'
+
+            row.innerHTML = `
+                <td>${imageElement}</td> <!-- 顯示車輛圖片 -->
+                <td>${record.plate_number}</td>
+                <td>${record.entry_time}</td>
+                <td>${record.exit_time || '尚未離場'}</td>
+                <td>${record.fee || '尚未計算'}</td>
+                <td><button onclick="vehicleExit(${record.id})">離場</button></td>
+                <td><button onclick="deleteRecord(${record.id})">刪除</button></td>
+            `
+            tableBody.appendChild(row)
         })
-    }).fail(function () {
-        alert('載入紀錄失敗，請稍後再試！')
-    })
+    } else {
+        tableBody.innerHTML = '<tr><td colspan="7">無車輛紀錄</td></tr>' // 更新 colspan
+    }
 }
 
 // 進場請求
@@ -64,8 +68,14 @@ function vehicleExit(recordId) {
         url: '/exit/' + recordId,
         method: 'POST',
         success: function (response) {
-            alert('車輛已離場，停車費用：' + response.record.fee + ' 元')
-            loadRecords() // 重新載入紀錄
+            // 檢查 response 和 response.record 是否存在
+            if (response && response.record) {
+                const fee = response.record.fee || '尚未計算' // 若 fee 不存在，顯示 '尚未計算'
+                alert('車輛已離場，停車費用：' + fee + ' 元')
+                loadRecords() // 重新載入紀錄
+            } else {
+                alert('無法獲取車輛資料或費用')
+            }
         },
         error: function () {
             alert('離場失敗，請稍後再試！')
@@ -139,3 +149,16 @@ function deleteRecord(recordId) {
 $(document).ready(() => {
     loadRecords()
 })
+
+function loadRecords() {
+    $.ajax({
+        url: '/get_records',
+        method: 'GET',
+        success: function (response) {
+            updateRecordsTable(response)
+        },
+        error: function () {
+            alert('無法載入紀錄，請稍後再試！')
+        },
+    })
+}
