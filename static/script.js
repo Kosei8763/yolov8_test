@@ -3,40 +3,98 @@ const socket = io.connect('http://127.0.0.1:5000')
 socket.on('connect', function () {
     console.log('✅ WebSocket 已連線')
 })
-
+socket.on('disconnect', function () {
+    console.warn('⚠️ WebSocket 連線中斷，嘗試重新連線...')
+})
 socket.on('update_records', function (data) {
     console.log('📢 收到新紀錄更新')
     updateRecordsTable(data)
 })
 
-function updateRecordsTable(records) {
-    const tableBody = document.getElementById('records-table') // 確保這是您表格的正確 ID
-    tableBody.innerHTML = '' // 清空表格
+let videoStream = null
+let video = document.getElementById('video')
+let canvas = document.createElement('canvas')
+let context = canvas.getContext('2d')
+let isRecognizing = false // 避免短時間內多次辨識
 
-    // 檢查 records 是否為陣列並且包含資料
-    if (Array.isArray(records) && records.length > 0) {
-        records.forEach((record) => {
-            const row = document.createElement('tr')
-            row.id = 'record-' + record.id // 設置唯一 ID 以便刪除
+// 啟動攝影機
+navigator.mediaDevices
+    .getUserMedia({ video: { facingMode: 'environment' } })
+    .then((stream) => {
+        video.srcObject = stream
+        videoStream = stream
+        startContinuousRecognition() // 啟動持續辨識
+    })
+    .catch((error) => console.error('無法開啟攝影機', error))
 
-            const imageElement = record.plate_number
-                ? `<img src="static/plates/${record.plate_number}.jpg" alt="車輛圖片" width="100" height="auto">`
-                : '無圖片'
+// 持續擷取影像並送到後端
+function startContinuousRecognition() {
+    setInterval(() => {
+        if (isRecognizing) return // 如果正在辨識，不要重複發送
 
-            row.innerHTML = `
-                <td>${imageElement}</td> <!-- 顯示車輛圖片 -->
-                <td>${record.plate_number}</td>
-                <td>${record.entry_time}</td>
-                <td>${record.exit_time || '尚未離場'}</td>
-                <td>${record.fee || '尚未計算'}</td>
-                <td><button onclick="vehicleExit(${record.id})">離場</button></td>
-                <td><button onclick="deleteRecord(${record.id})">刪除</button></td>
-            `
-            tableBody.appendChild(row)
+        isRecognizing = true
+
+        // 擷取影像
+        canvas.width = video.videoWidth
+        canvas.height = video.videoHeight
+        context.drawImage(video, 0, 0, canvas.width, canvas.height)
+        let imageData = canvas.toDataURL('image/jpeg') // 轉 base64 格式
+
+        console.log('發送影像資料:', imageData) // 印出 base64 以檢查資料
+
+        // 發送至後端辨識車牌
+        $.ajax({
+            url: '/detect_license_plate',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ image: imageData }),
+            success: function (response) {
+                if (response.plate_number) {
+                    console.log('✅ 車牌辨識成功：', response.plate_number)
+                    $('#entry-plate').val(response.plate_number) // 顯示到輸入框
+                }
+            },
+            error: function () {
+                console.warn('⚠️ 辨識失敗，稍後重試')
+            },
+            complete: function () {
+                isRecognizing = false // 完成後允許下一次辨識
+            },
         })
-    } else {
-        tableBody.innerHTML = '<tr><td colspan="7">無車輛紀錄</td></tr>' // 更新 colspan
-    }
+    }, 3000) // 每 3 秒擷取一次影像
+}
+
+function updateRecordsTable(records) {
+    const tableBody = document.getElementById('records-table')
+
+    // 建立現有記錄的索引（用於比對哪些要更新）
+    const existingRows = {}
+    tableBody.querySelectorAll('tr').forEach((row) => {
+        const recordId = row.getAttribute('data-id')
+        if (recordId) existingRows[recordId] = row
+    })
+
+    records.forEach((record) => {
+        let row = existingRows[record.id]
+
+        if (!row) {
+            row = document.createElement('tr')
+            row.setAttribute('data-id', record.id)
+            tableBody.appendChild(row)
+        }
+
+        row.innerHTML = `
+            <td>
+                ${record.plate_number ? `<img src="static/plates/${record.plate_number}.jpg" width="100">` : '無圖片'}
+            </td>
+            <td>${record.plate_number}</td>
+            <td>${record.entry_time}</td>
+            <td>${record.exit_time || '尚未離場'}</td>
+            <td>${record.fee || '尚未計算'}</td>
+            <td><button onclick="vehicleExit(${record.id})">離場</button></td>
+            <td><button onclick="deleteRecord(${record.id})">刪除</button></td>
+        `
+    })
 }
 
 // 進場請求
@@ -90,38 +148,6 @@ navigator.mediaDevices
         document.getElementById('video').srcObject = stream
     })
     .catch((error) => console.error('無法開啟攝影機', error))
-
-// 拍攝影像並傳送到後端辨識
-function captureImage() {
-    let video = document.getElementById('video')
-    let canvas = document.getElementById('canvas')
-    let context = canvas.getContext('2d')
-
-    // 設定畫布尺寸與擷取影像
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
-    context.drawImage(video, 0, 0, canvas.width, canvas.height)
-
-    // 轉換成 Base64
-    let imageData = canvas.toDataURL('image/jpeg')
-
-    // 傳送影像到 Flask 後端
-    fetch('/yolo_plate_recognition', {
-        method: 'POST',
-        body: JSON.stringify({ image: imageData }),
-        headers: { 'Content-Type': 'application/json' },
-    })
-        .then((response) => response.json())
-        .then((data) => {
-            if (data.plate_number) {
-                document.getElementById('yolo-recognized-plate').innerText = '辨識車牌：' + data.plate_number
-                document.getElementById('entry-plate').value = data.plate_number
-            } else {
-                alert('未能成功辨識車牌')
-            }
-        })
-        .catch(() => alert('上傳失敗'))
-}
 
 // 刪除紀錄
 function deleteRecord(recordId) {

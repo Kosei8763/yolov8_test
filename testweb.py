@@ -18,13 +18,15 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///parking.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# 設定圖片上傳資料夾
-# 確保車牌圖片存放資料夾存在
+# 設定圖片上傳資料夾，確保車牌圖片存放資料夾存在
 PLATE_FOLDER = "static/plates"
 if not os.path.exists(PLATE_FOLDER):
     os.makedirs(PLATE_FOLDER)
 
 CORS(app)  # 啟用 CORS
+
+# 載入 Haar Cascade 車牌模型
+plate_cascade = cv2.CascadeClassifier("haar_carplate.xml")
 
 # 車輛進出記錄表
 
@@ -179,8 +181,8 @@ def save_plate_image(image, plate_number):
     return image_path
 
 
-@app.route('/yolo_plate_recognition', methods=['POST'])
-def yolo_plate_recognition():
+@app.route('/detect_license_plate', methods=['POST'])
+def detect_license_plate():
     try:
         data = request.json.get('image', None)
         if not data:
@@ -213,6 +215,20 @@ def yolo_plate_recognition():
 
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
+
+
+def detect_license_plate_haar(image):
+    """ 使用 Haar Cascade 偵測車牌 """
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    plates = plate_cascade.detectMultiScale(
+        gray, scaleFactor=1.1, minNeighbors=5, minSize=(60, 20))
+
+    for (x, y, w, h) in plates:
+        cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        plate_img = image[y:y+h, x:x+w]  # 擷取車牌區域
+        return plate_img  # 回傳車牌圖片
+
+    return None  # 如果沒偵測到車牌，回傳 None
 
 
 @app.route('/')
