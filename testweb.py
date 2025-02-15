@@ -25,9 +25,6 @@ if not os.path.exists(PLATE_FOLDER):
 
 CORS(app)  # 啟用 CORS
 
-# 載入 Haar Cascade 車牌模型
-plate_cascade = cv2.CascadeClassifier("haar_carplate.xml")
-
 # 車輛進出記錄表
 
 
@@ -108,6 +105,7 @@ def get_all_parking_records():
 @app.route("/get_records", methods=["GET"])
 def get_records():
     records = get_all_parking_records()
+    delete_unused_images()  # 刪除不再紀錄中的車牌圖片
     return jsonify(records)
 
 
@@ -123,8 +121,29 @@ def entry():
     db.session.add(new_record)
     db.session.commit()
 
+    # 刪除不再紀錄中的車牌圖片
+    delete_unused_images()
+
     notify_clients()  # 🔥 讓所有前端即時更新
     return jsonify({"success": True, "message": "進場成功"}), 200
+
+
+def delete_unused_images():
+    """ 刪除資料庫中已不再存在的車牌圖片 """
+    # 獲取所有資料庫中的車牌號碼
+    all_plate_numbers = [
+        record.plate_number for record in ParkingRecord.query.all()]
+
+    # 獲取所有圖片檔案
+    all_images = os.listdir(PLATE_FOLDER)
+
+    # 遍歷圖片檔案，刪除不在資料庫中的圖片
+    for image_file in all_images:
+        plate_number = image_file.split('.')[0]  # 取得車牌號碼部分
+        if plate_number not in all_plate_numbers:
+            image_path = os.path.join(PLATE_FOLDER, image_file)
+            os.remove(image_path)
+            print(f"✅ 刪除圖片: {image_path}")
 
 
 @app.route("/exit/<int:record_id>", methods=["POST"])
@@ -170,6 +189,7 @@ def delete_record(record_id):
     db.session.delete(record)
     db.session.commit()
 
+    delete_unused_images()  # 刪除不再紀錄中的車牌圖片
     notify_clients()  # 🔥 讓所有前端即時更新
     return jsonify({"success": True, "message": "紀錄已刪除"}), 200
 
@@ -215,20 +235,6 @@ def detect_license_plate():
 
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
-
-
-def detect_license_plate_haar(image):
-    """ 使用 Haar Cascade 偵測車牌 """
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    plates = plate_cascade.detectMultiScale(
-        gray, scaleFactor=1.1, minNeighbors=5, minSize=(60, 20))
-
-    for (x, y, w, h) in plates:
-        cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
-        plate_img = image[y:y+h, x:x+w]  # 擷取車牌區域
-        return plate_img  # 回傳車牌圖片
-
-    return None  # 如果沒偵測到車牌，回傳 None
 
 
 @app.route('/')
