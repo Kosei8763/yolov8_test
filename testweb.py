@@ -35,10 +35,42 @@ class ParkingRecord(db.Model):
     exit_time = db.Column(db.DateTime, nullable=True)
     fee = db.Column(db.Float, default=0.0)
 
+# 車位表
+
+
+class ParkingSpace(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    space_number = db.Column(
+        db.Integer, nullable=False, unique=True)  # 車位編號 1-8
+    occupied = db.Column(db.Boolean, default=False)  # 是否佔用
+    plate_number = db.Column(db.String(20), nullable=True)  # 車牌號碼（若有）
+    charging = db.Column(db.Boolean, default=False)  # 是否開啟充電服務
+    charging_start_time = db.Column(db.DateTime, nullable=True)  # 充電開始時間
+    charging_cost = db.Column(db.Float, default=0.0)  # 充電費用
+
+# 初始化車位
+
+
+def init_parking_spaces():
+    # 檢查是否已有車位資料，若無則插入 8 個空車位
+    if ParkingSpace.query.count() == 0:
+        for i in range(1, 9):  # 車位編號 1-8
+            space = ParkingSpace(
+                space_number=i,
+                occupied=False,  # 初始為空車位
+                plate_number=None,
+                charging=False,  # 初始不開啟充電服務
+                charging_start_time=None,
+                charging_cost=0.0
+            )
+            db.session.add(space)
+        db.session.commit()
+
 
 # 初始化資料庫
 with app.app_context():
     db.create_all()
+    init_parking_spaces()  # 初始化車位
 
 # 加載 YOLOv8 訓練好的模型
 model = YOLO("car_plate.pt")  # 替換成你的模型權重檔案
@@ -235,6 +267,38 @@ def detect_license_plate():
 
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route('/get_parking_spaces', methods=['GET'])
+def get_parking_spaces():
+    spaces = ParkingSpace.query.all()
+    result = []
+    for space in spaces:
+        result.append({
+            'id': space.id,
+            'space_number': space.space_number,
+            'occupied': space.occupied,
+            'plate_number': space.plate_number,
+            'charging': space.charging,
+            'charging_cost': space.charging_cost,
+        })
+    return jsonify(result)
+
+
+@app.route('/toggle_occupied/<int:space_id>', methods=['POST'])
+def toggle_occupied(space_id):
+    space = ParkingSpace.query.get_or_404(space_id)
+    space.occupied = not space.occupied
+    db.session.commit()
+    return jsonify({'message': '車位狀態已更新！'})
+
+
+@app.route('/toggle_charging/<int:space_id>', methods=['POST'])
+def toggle_charging(space_id):
+    space = ParkingSpace.query.get_or_404(space_id)
+    space.charging = not space.charging
+    db.session.commit()
+    return jsonify({'message': '充電服務已更新！'})
 
 
 @app.route('/')

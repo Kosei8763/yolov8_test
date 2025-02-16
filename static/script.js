@@ -141,3 +141,103 @@ function deleteRecord(recordId) {
         })
     }
 }
+$(document).ready(function () {
+    loadParkingSpaces() // 頁面載入時自動載入車位列表
+
+    // 進場請求
+    function vehicleEntry() {
+        let plateNumber = $('#entry-plate').val()
+        if (!plateNumber) {
+            alert('請輸入車牌號碼！')
+            return
+        }
+
+        $.ajax({
+            url: '/entry',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ plate_number: plateNumber }),
+            success: function (response) {
+                alert(response.message)
+                loadParkingSpaces() // 重新載入車位資料
+            },
+            error: function (response) {
+                alert(response.responseJSON.message)
+            },
+        })
+    }
+
+    // 載入車位資料
+    function loadParkingSpaces() {
+        $.ajax({
+            url: '/get_parking_spaces',
+            method: 'GET',
+            success: function (response) {
+                updateParkingSpacesTable(response)
+            },
+            error: function () {
+                alert('無法載入車位資料，請稍後再試！')
+            },
+        })
+    }
+
+    // 更新車位表格
+    function updateParkingSpacesTable(spaces) {
+        const tableBody = $('#parking-spaces-table tbody')
+        tableBody.empty() // 清空現有的表格內容
+
+        spaces.forEach((space) => {
+            const row = $('<tr></tr>')
+            row.append(`<td>${space.space_number}</td>`)
+            row.append(`<td>${space.occupied ? '已佔用' : '可用'}</td>`)
+            row.append(`<td>${space.plate_number || '無'}</td>`)
+            row.append(
+                `<td><button onclick="toggleCharging(${space.id}, ${space.charging})">${
+                    space.charging ? '關閉充電' : '開啟充電'
+                }</button></td>`
+            )
+            row.append(`<td>${space.charging_cost} 元</td>`)
+            row.append(
+                `<td><button onclick="toggleOccupied(${space.id}, ${space.occupied})">${
+                    space.occupied ? '釋放車位' : '佔用車位'
+                }</button></td>`
+            )
+            tableBody.append(row)
+        })
+    }
+
+    // 切換車位佔用狀態
+    function toggleOccupied(spaceId, isOccupied) {
+        $.ajax({
+            url: `/toggle_occupied/${spaceId}`,
+            method: 'POST',
+            success: function (response) {
+                alert(response.message)
+                loadParkingSpaces() // 重新載入車位資料
+            },
+            error: function () {
+                alert('操作失敗，請稍後再試！')
+            },
+        })
+    }
+
+    // 切換充電服務
+    function toggleCharging(spaceId, isCharging) {
+        $.ajax({
+            url: `/toggle_charging/${spaceId}`,
+            method: 'POST',
+            success: function (response) {
+                alert(response.message)
+                loadParkingSpaces() // 重新載入車位資料
+            },
+            error: function () {
+                alert('操作失敗，請稍後再試！')
+            },
+        })
+    }
+
+    // 註冊進場函數
+    window.vehicleEntry = vehicleEntry // 讓進場函數可以被 HTML 調用
+    window.toggleOccupied = toggleOccupied
+    window.toggleCharging = toggleCharging
+})
