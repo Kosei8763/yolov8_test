@@ -232,6 +232,15 @@ def save_plate_image(image, plate_number):
     cv2.imwrite(image_path, image)
     return image_path
 
+# 檢查車牌號碼是否合法
+
+
+def is_valid_plate(plate_number):
+    if len(plate_number) >= 6 and len(plate_number) <= 8 and '-' in plate_number:
+        return True
+    else:
+        return False
+
 
 @app.route('/detect_license_plate', methods=['POST'])
 def detect_license_plate():
@@ -253,7 +262,7 @@ def detect_license_plate():
         # 🚀 YOLO 車牌辨識
         plate_number = recognize_plate_yolo(frame)
 
-        if plate_number and (len(plate_number) <= 8 and len(plate_number) >= 6):
+        if plate_number and is_valid_plate(plate_number):
             plate_filename = f"{plate_number}.jpg"
             plate_path = os.path.join(PLATE_FOLDER, plate_filename)
 
@@ -287,10 +296,31 @@ def get_parking_spaces():
 
 @app.route('/toggle_occupied/<int:space_id>', methods=['POST'])
 def toggle_occupied(space_id):
-    space = ParkingSpace.query.get_or_404(space_id)
-    space.occupied = not space.occupied
+    data = request.json
+    plate_number = data.get('plate_number')
+    is_occupied = data.get('is_occupied')
+
+    space = ParkingSpace.query.get(space_id)
+    if not space:
+        return jsonify({"success": False, "message": "車位不存在"}), 404
+
+    if is_occupied:
+        # 釋放車位
+        space.occupied = False
+        space.plate_number = None
+    else:
+        # 佔用車位
+        space.occupied = True
+        space.plate_number = plate_number
+
+        # 新增進場紀錄
+        new_record = ParkingRecord(
+            plate_number=plate_number, entry_time=datetime.now())
+        db.session.add(new_record)
+
     db.session.commit()
-    return jsonify({'message': '車位狀態已更新！'})
+    notify_clients()  # 更新前端
+    return jsonify({"success": True, "message": "車位狀態已更新"}), 200
 
 
 @app.route('/toggle_charging/<int:space_id>', methods=['POST'])
