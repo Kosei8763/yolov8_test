@@ -221,7 +221,7 @@ def detect_license_plate():
         # 🚀 YOLO 車牌辨識
         plate_number = recognize_plate_yolo(frame)
 
-        if plate_number:
+        if plate_number and (len(plate_number) <= 8 and len(plate_number) >= 6):
             plate_filename = f"{plate_number}.jpg"
             plate_path = os.path.join(PLATE_FOLDER, plate_filename)
 
@@ -242,31 +242,11 @@ def home():
     return render_template("index.html")
 
 
-@app.route('/calculate_fee_page')
-def calculate_fee_page():
-    return render_template("calculate_fee.html")
-
-# 計算費用api
+@app.route('/record_page')
+def record():
+    return render_template("record.html")
 
 
-@app.route('/calculate_fee', methods=['POST'])
-def calculate_fee():
-    data = request.json
-    plate_number = data.get("plate_number")
-
-    record = ParkingRecord.query.filter_by(
-        plate_number=plate_number, exit_time=None).first()
-
-    if not record:
-        return jsonify({"error": "未找到該車輛進場紀錄"}), 404
-
-    current_time = datetime.utcnow()
-    duration = (current_time - record.entry_time).total_seconds() / \
-        3600  # 轉換為小時
-    estimated_fee = round(duration * 50, 2)  # 每小時 50 元
-
-    return jsonify({"plate_number": plate_number, "entry_time": record.entry_time, "estimated_fee": estimated_fee})
-
-
+# 啟動 Flask 應用程式
 if __name__ == "__main__":
     socketio.run(app, debug=True)

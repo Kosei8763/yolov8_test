@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+    <head>
+        <script src="https://cdn.socket.io/4.5.1/socket.io.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>計算停車費用</title>
+        <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+        <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    </head>
+    <body>
+        <!-- 車輛紀錄表格 -->
+        <h2>車輛紀錄</h2>
+        <button onclick="loadRecords()">重新整理</button>
+        <table border="1">
+            <thead>
+                <tr>
+                    <th>車輛圖片</th>
+                    <th>車牌號碼</th>
+                    <th>進場時間</th>
+                    <th>離場時間</th>
+                    <th>停車費用</th>
+                    <th>紀錄操作</th>
+                </tr>
+            </thead>
+            <tbody id="records-table"></tbody>
+        </table>
+        <a href="/">返回首頁</a>
+
+        <script src="{{ url_for('static', filename='record.js') }}"></script>
+    </body>
+</html>

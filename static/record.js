@@ -11,57 +11,39 @@ socket.on('update_records', function (data) {
     updateRecordsTable(data)
 })
 
-let videoStream = null
-let video = document.getElementById('video')
-let canvas = document.createElement('canvas')
-let context = canvas.getContext('2d')
-let isRecognizing = false // 避免短時間內多次辨識
+function updateRecordsTable(records) {
+    const tableBody = document.getElementById('records-table')
 
-// 啟動攝影機
-navigator.mediaDevices
-    .getUserMedia({ video: { facingMode: 'environment' } })
-    .then((stream) => {
-        video.srcObject = stream
-        videoStream = stream
-        startContinuousRecognition() // 啟動持續辨識
+    // 建立現有記錄的索引（用於比對哪些要更新）
+    const existingRows = {}
+    tableBody.querySelectorAll('tr').forEach((row) => {
+        const recordId = row.getAttribute('data-id')
+        if (recordId) existingRows[recordId] = row
     })
-    .catch((error) => console.error('無法開啟攝影機', error))
 
-// 持續擷取影像並送到後端
-function startContinuousRecognition() {
-    setInterval(() => {
-        if (isRecognizing) return // 如果正在辨識，不要重複發送
+    records.forEach((record) => {
+        let row = existingRows[record.id]
 
-        isRecognizing = true
+        if (!row) {
+            row = document.createElement('tr')
+            row.setAttribute('data-id', record.id)
+            tableBody.appendChild(row)
+        }
 
-        // 擷取影像
-        canvas.width = video.videoWidth
-        canvas.height = video.videoHeight
-        context.drawImage(video, 0, 0, canvas.width, canvas.height)
-        let imageData = canvas.toDataURL('image/jpeg') // 轉 base64 格式
-
-        console.log('發送影像資料:', imageData) // 印出 base64 以檢查資料
-
-        // 發送至後端辨識車牌
-        $.ajax({
-            url: '/detect_license_plate',
-            method: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify({ image: imageData }),
-            success: function (response) {
-                if (response.plate_number) {
-                    console.log('✅ 車牌辨識成功：', response.plate_number)
-                    $('#entry-plate').val(response.plate_number) // 顯示到輸入框
-                }
-            },
-            error: function () {
-                console.warn('⚠️ 辨識失敗，稍後重試')
-            },
-            complete: function () {
-                isRecognizing = false // 完成後允許下一次辨識
-            },
-        })
-    }, 3000) // 每 3 秒擷取一次影像
+        row.innerHTML = `
+            <td>
+                ${record.plate_number ? `<img src="static/plates/${record.plate_number}.jpg" width="100">` : '無圖片'}
+            </td>
+            <td>${record.plate_number}</td>
+            <td>${record.entry_time}</td>
+            <td>${record.exit_time || '尚未離場'}</td>
+            <td>${record.fee || '尚未計算'}</td>
+            <td>
+                ${record.exit_time ? '' : `<button onclick="vehicleExit(${record.id})">離場</button>`}
+                <button onclick="deleteRecord(${record.id})">刪除</button>
+            </td>
+        `
+    })
 }
 
 // 進場請求
@@ -112,14 +94,6 @@ function vehicleExit(recordId) {
     })
 }
 
-// 取得手機鏡頭畫面
-navigator.mediaDevices
-    .getUserMedia({ video: { facingMode: 'environment' } })
-    .then((stream) => {
-        document.getElementById('video').srcObject = stream
-    })
-    .catch((error) => console.error('無法開啟攝影機', error))
-
 // 刪除紀錄
 function deleteRecord(recordId) {
     if (recordId === undefined || recordId === null) {
@@ -140,4 +114,22 @@ function deleteRecord(recordId) {
             },
         })
     }
+}
+
+// 頁面載入時自動載入紀錄
+$(document).ready(() => {
+    loadRecords()
+})
+
+function loadRecords() {
+    $.ajax({
+        url: '/get_records',
+        method: 'GET',
+        success: function (response) {
+            updateRecordsTable(response)
+        },
+        error: function () {
+            alert('無法載入紀錄，請稍後再試！')
+        },
+    })
 }
