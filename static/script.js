@@ -178,12 +178,11 @@ $(document).ready(function () {
 
     // **切換車位佔用狀態**
     function toggleOccupied(spaceId, isOccupied) {
-        let plateNumber = prompt('請輸入車牌號碼：')
+        let plateNumber = $('#entry-plate').val()
         if (!plateNumber) {
             alert('請輸入車牌號碼！')
             return
         }
-
         if (!isOccupied) {
             // **佔用車位時，自動執行進場**
             $.ajax({
