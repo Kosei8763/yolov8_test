@@ -13,6 +13,7 @@ socket.on('update_records', function (data) {
 
 function updateRecordsTable(records) {
     const tableBody = document.getElementById('records-table')
+    tableBody.innerHTML = '' // 清空表格內容
 
     // 建立現有記錄的索引（用於比對哪些要更新）
     const existingRows = {}
@@ -107,7 +108,7 @@ function deleteRecord(recordId) {
             type: 'DELETE',
             success: function (response) {
                 alert(response.message)
-                $('#record-' + recordId).remove() // 從畫面移除該行
+                loadRecords() // 重新載入紀錄
             },
             error: function (response) {
                 alert('刪除失敗：' + (response.responseJSON.message || '未知錯誤'))

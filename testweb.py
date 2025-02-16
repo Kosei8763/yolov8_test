@@ -11,7 +11,7 @@ import base64
 from flask_socketio import SocketIO
 
 app = Flask(__name__)
-socketio = SocketIO(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # 設定 SQLite 資料庫連線資訊
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///parking.db'
