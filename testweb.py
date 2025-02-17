@@ -239,9 +239,15 @@ def exit_parking(space_id):
         return jsonify({"success": False, "message": "離場時間不能早於進場時間"}), 400
 
     # 計算停車費用
+
     duration = (current_time - record.entry_time).total_seconds() / \
         3600  # 轉換為小時
-    fee = round(duration * 50, 2)  # 每小時 50 元
+    if duration <= 1:
+        fee = 60  # 前一小時收費 60 元
+    else:
+        fee = 60 + (duration - 1) * 20  # 之後每半小時加收 10 元，即每小時加收 20 元
+
+    fee = round(fee, 2)  # 四捨五入到小數點後兩位
 
     # 更新紀錄的離場時間和費用
     record.exit_time = current_time

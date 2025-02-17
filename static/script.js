@@ -74,9 +74,14 @@ function updateParkingSpacesTable(spaces) {
         row.append(`<td>${space.occupied ? '已佔用' : '可用'}</td>`)
         row.append(`<td>${space.plate_number || '無'}</td>`)
         row.append(
-            `<td><button onclick="toggleCharging(${space.id}, ${space.charging})">${
-                space.charging ? '關閉充電' : '開啟充電'
-            }</button></td>`
+            `<td>
+                <label class="switch">
+                    <input type="checkbox" ${space.charging ? 'checked' : ''} onclick="toggleCharging(${
+                space.id
+            }, this)">
+                    <span class="slider round"></span>
+                </label>
+            </td>`
         )
         row.append(`<td>${space.charging_cost} 元</td>`)
         row.append(
