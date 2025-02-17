@@ -379,9 +379,9 @@ def toggle_occupied(space_id):
         db.session.add(new_record)
 
     db.session.commit()
-    notify_parking_spaces()
-    notify_parking_records()  # 通知前端車位狀態更新
-    return jsonify({"success": True, "message": "車位狀態已更新"}), 200
+    notify_parking_records()
+    notify_parking_spaces()  # 通知前端車位狀態更新
+    return jsonify({"success": True, "message": "車位狀態已更新"})
 
 
 @app.route('/toggle_charging/<int:space_id>', methods=['POST'])
@@ -389,8 +389,9 @@ def toggle_charging(space_id):
     space = ParkingSpace.query.get_or_404(space_id)
     space.charging = not space.charging
     db.session.commit()
+    notify_parking_records()
     notify_parking_spaces()  # 通知前端車位狀態更新
-    return jsonify({'message': '充電服務已更新！'})
+    return jsonify({"success": True, "message": "充電狀態已更新"}), 200
 
 
 @app.route('/')
