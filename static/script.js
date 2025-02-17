@@ -6,9 +6,9 @@ socket.on('connect', function () {
 socket.on('disconnect', function () {
     console.warn('⚠️ WebSocket 連線中斷，嘗試重新連線...')
 })
-socket.on('update_records', function (data) {
-    console.log('📢 收到新紀錄更新')
-    updateRecordsTable(data)
+socket.on('update_parking_spaces', function (data) {
+    console.log('📢 收到新車位更新')
+    updateParkingSpacesTable(data)
 })
 
 let videoStream = null
@@ -112,35 +112,13 @@ function vehicleExit(recordId) {
     })
 }
 
-// 刪除紀錄
-function deleteRecord(recordId) {
-    if (recordId === undefined || recordId === null) {
-        alert('無效的記錄 ID！')
-        return
-    }
-
-    if (confirm('確定要刪除這筆記錄嗎？')) {
-        $.ajax({
-            url: '/delete_record/' + recordId,
-            type: 'DELETE',
-            success: function (response) {
-                alert(response.message)
-                $('#record-' + recordId).remove() // 從畫面移除該行
-            },
-            error: function (response) {
-                alert('刪除失敗：' + (response.responseJSON.message || '未知錯誤'))
-            },
-        })
-    }
-}
-
 $(document).ready(function () {
     loadParkingSpaces() // 頁面載入時自動載入車位列表
 
     // 載入車位資料
     function loadParkingSpaces() {
         $.ajax({
-            url: '/get_parking_spaces',
+            url: '/get_spaces',
             method: 'GET',
             success: function (response) {
                 updateParkingSpacesTable(response)
@@ -175,74 +153,56 @@ $(document).ready(function () {
             tableBody.append(row)
         })
     }
-
-    // **切換車位佔用狀態**
     function toggleOccupied(spaceId, isOccupied) {
-        let plateNumber = $('#entry-plate').val()
-        if (!plateNumber) {
-            alert('請輸入車牌號碼！')
-            return
-        }
-        if (!isOccupied) {
-            // **佔用車位時，自動執行進場**
+        if (isOccupied) {
+            // **釋放車位(離場)**: 發送離場請求給後端
             $.ajax({
-                url: '/entry',
+                url: `/exit/${spaceId}`, // 這裡的路由應該根據後端設計調整
+                method: 'POST',
+                contentType: 'application/json',
+                success: function (response) {
+                    alert(response.message)
+                    updateParkingStatus(spaceId, null, false) // 標記車位已釋放
+                    loadParkingSpaces() // 重新載入車位資料
+                },
+                error: function (response) {
+                    alert('離場失敗：' + (response.responseJSON.message || '未知錯誤'))
+                },
+            })
+        } else {
+            // **佔用車位(進場)**: 發送進場請求給後端
+            let plateNumber = $('#entry-plate').val()
+            if (!plateNumber) {
+                alert('請輸入車牌號碼！')
+                return
+            }
+            $.ajax({
+                url: `/entry/${spaceId}`, // 這裡的路由應該根據後端設計調整
                 method: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify({ plate_number: plateNumber }),
                 success: function (response) {
                     alert(response.message)
                     updateParkingStatus(spaceId, plateNumber, true) // 標記車位已佔用
+                    loadParkingSpaces() // 重新載入車位資料
                 },
                 error: function (response) {
                     alert('進場失敗：' + (response.responseJSON.message || '未知錯誤'))
                 },
             })
-        } else {
-            // **釋放車位時，先查找記錄並自動離場**
-            $.ajax({
-                url: `/find_record/${plateNumber}`,
-                method: 'GET',
-                success: function (response) {
-                    if (response && response.record_id) {
-                        // 發送離場請求
-                        $.ajax({
-                            url: `/exit/${response.record_id}`,
-                            method: 'POST',
-                            success: function (exitResponse) {
-                                alert('車輛已離場，停車費用：' + (exitResponse.record.fee || '尚未計算') + ' 元')
-                                updateParkingStatus(spaceId, null, false) // 標記車位可用
-                            },
-                            error: function () {
-                                alert('離場失敗，請稍後再試！')
-                            },
-                        })
-                    } else {
-                        alert('未找到車輛記錄，無法離場')
-                    }
-                },
-                error: function () {
-                    alert('查詢車輛記錄失敗，請稍後再試！')
-                },
-            })
         }
     }
 
-    // **更新車位狀態**
     function updateParkingStatus(spaceId, plateNumber, isOccupied) {
-        $.ajax({
-            url: `/toggle_occupied/${spaceId}`,
-            method: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify({ plate_number: plateNumber, is_occupied: isOccupied }),
-            success: function (response) {
-                alert(response.message)
-                loadParkingSpaces() // 重新載入車位資料
-            },
-            error: function () {
-                alert('車位狀態更新失敗，請稍後再試！')
-            },
-        })
+        // 這個函數用來更新前端顯示的車位狀態
+        let spaceElement = $('#space-' + spaceId) // 假設每個車位都有對應的 ID
+        if (isOccupied) {
+            spaceElement.text('佔用: ' + plateNumber)
+            spaceElement.addClass('occupied')
+        } else {
+            spaceElement.text('可用')
+            spaceElement.removeClass('occupied')
+        }
     }
 
     // 切換充電服務

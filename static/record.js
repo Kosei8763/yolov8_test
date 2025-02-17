@@ -40,62 +40,13 @@ function updateRecordsTable(records) {
             <td>${record.exit_time || '尚未離場'}</td>
             <td>${record.fee || '尚未計算'}</td>
             <td>
-                ${record.exit_time ? '' : `<button onclick="vehicleExit(${record.id})">離場</button>`}
                 <button onclick="deleteRecord(${record.id})">刪除</button>
             </td>
         `
     })
 }
 
-// 進場請求
-function vehicleEntry() {
-    let plateNumber = $('#entry-plate').val()
-    if (!plateNumber) {
-        alert('請輸入車牌號碼！')
-        return
-    }
-
-    $.ajax({
-        url: '/entry',
-        method: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify({ plate_number: plateNumber }),
-        success: function (response) {
-            alert(response.message)
-            loadRecords() // 重新載入紀錄
-        },
-        error: function (response) {
-            alert(response.responseJSON.message)
-        },
-    })
-}
-
-// 離場請求
-function vehicleExit(recordId) {
-    if (recordId === undefined || recordId === null) {
-        alert('無效的記錄 ID！')
-        return
-    }
-    $.ajax({
-        url: '/exit/' + recordId,
-        method: 'POST',
-        success: function (response) {
-            // 檢查 response 和 response.record 是否存在
-            if (response && response.record) {
-                const fee = response.record.fee || '尚未計算' // 若 fee 不存在，顯示 '尚未計算'
-                alert('車輛已離場，停車費用：' + fee + ' 元')
-                loadRecords() // 重新載入紀錄
-            } else {
-                alert('無法獲取車輛資料或費用')
-            }
-        },
-        error: function () {
-            alert('離場失敗，請稍後再試！')
-        },
-    })
-}
-
-// 刪除紀錄
+//刪除紀錄
 function deleteRecord(recordId) {
     if (recordId === undefined || recordId === null) {
         alert('無效的記錄 ID！')

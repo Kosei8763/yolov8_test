@@ -115,12 +115,21 @@ def recognize_plate_yolo(image):
 def handle_connect():
     print("🔗 客戶端已連線")
 
-# 更新紀錄後通知前端
+# 發送所有車位資料給所有連線的客戶端
 
 
-def notify_clients():
-    records = get_all_parking_records()  # 取得所有紀錄
-    socketio.emit("update_records", records)
+def notify_parking_spaces():
+    spaces_data = get_all_parking_records()  # 取得所有停車紀錄
+    socketio.emit('update_parking_spaces', spaces_data)
+
+# 發送所有停車紀錄資料給所有連線的客戶端
+
+
+def notify_parking_records():
+    records_data = get_all_parking_records()  # 取得所有停車紀錄
+    socketio.emit("update_records", records_data)
+
+# 取得所有停車紀錄並格式化
 
 
 def get_all_parking_records():
@@ -133,6 +142,20 @@ def get_all_parking_records():
         'fee': record.fee
     } for record in records]
 
+# 取得所有車位資料並格式化
+
+
+def get_all_parking_spaces():
+    spaces = ParkingSpace.query.all()
+    return [{
+        'id': space.id,
+        'space_number': space.space_number,
+        'occupied': space.occupied,
+        'plate_number': space.plate_number,
+        'charging': space.charging,
+        'charging_cost': space.charging_cost,
+    } for space in spaces]
+
 
 @app.route("/get_records", methods=["GET"])
 def get_records():
@@ -141,23 +164,10 @@ def get_records():
     return jsonify(records)
 
 
-@app.route("/entry", methods=["POST"])
-def entry():
-    # 模擬進場邏輯
-    plate_number = request.json.get("plate_number", "Unknown")
-    entry_time = datetime.now()
-
-    # 儲存進場紀錄（假設存入資料庫）
-    new_record = ParkingRecord(
-        plate_number=plate_number, entry_time=entry_time)
-    db.session.add(new_record)
-    db.session.commit()
-
-    # 刪除不再紀錄中的車牌圖片
-    delete_unused_images()
-
-    notify_clients()  # 🔥 讓所有前端即時更新
-    return jsonify({"success": True, "message": "進場成功"}), 200
+@app.route("/get_spaces", methods=["GET"])
+def get_spaces():
+    spaces = get_all_parking_spaces()
+    return jsonify(spaces)
 
 
 def delete_unused_images():
@@ -176,13 +186,52 @@ def delete_unused_images():
             image_path = os.path.join(PLATE_FOLDER, image_file)
             os.remove(image_path)
             print(f"✅ 刪除圖片: {image_path}")
+# 進場邏輯
 
 
-@app.route("/exit/<int:record_id>", methods=["POST"])
-def exit_parking(record_id):
-    record = db.session.get(ParkingRecord, record_id)
+@app.route("/entry/<int:space_id>", methods=["POST"])
+def entry(space_id):
+    # 模擬進場邏輯
+    plate_number = request.json.get("plate_number", "Unknown")
+    entry_time = datetime.now()
+
+    # 儲存進場紀錄
+    new_record = ParkingRecord(
+        plate_number=plate_number, entry_time=entry_time)
+    db.session.add(new_record)
+
+    # 根據 space_id 更新對應車位的佔用狀態
+    space = ParkingSpace.query.get(space_id)  # 查找指定的車位
+    if space and not space.occupied:  # 確保該車位尚未佔用
+        space.occupied = True
+        space.plate_number = plate_number
+        db.session.commit()
+
+        # 刪除不再紀錄中的車牌圖片
+        delete_unused_images()
+
+        # 通知前端更新
+        notify_parking_records()
+        notify_parking_spaces()
+
+        return jsonify({"success": True, "message": "進場成功"}), 200
+    else:
+        return jsonify({"success": False, "message": "車位已佔用或不存在"}), 400
+# 離場邏輯
+
+
+@app.route("/exit/<int:space_id>", methods=["POST"])
+def exit_parking(space_id):
+    # 查找指定的車位
+    space = ParkingSpace.query.get(space_id)
+    if not space or not space.occupied:
+        return jsonify({"success": False, "message": "車位不存在或未佔用"}), 400
+
+    # 查找對應的進場紀錄
+    record = ParkingRecord.query.filter_by(
+        plate_number=space.plate_number, exit_time=None).first()
     if not record:
-        return jsonify({"success": False, "message": "紀錄不存在"}), 400
+        return jsonify({"success": False, "message": "找不到進場紀錄"}), 404
 
     # 確保離場時間不早於進場時間
     current_time = datetime.now()
@@ -194,11 +243,19 @@ def exit_parking(record_id):
         3600  # 轉換為小時
     fee = round(duration * 50, 2)  # 每小時 50 元
 
+    # 更新紀錄的離場時間和費用
     record.exit_time = current_time
     record.fee = fee
+
+    # 釋放車位
+    space.occupied = False
+    space.plate_number = None
     db.session.commit()
 
-    notify_clients()  # 🔥 讓所有前端即時更新
+    # 通知前端更新
+    notify_parking_records()
+    notify_parking_spaces()
+
     return jsonify({
         "success": True,
         "message": "離場成功",
@@ -222,7 +279,8 @@ def delete_record(record_id):
     db.session.commit()
 
     delete_unused_images()  # 刪除不再紀錄中的車牌圖片
-    notify_clients()  # 🔥 讓所有前端即時更新
+    notify_parking_records()
+    notify_parking_spaces()  # 🔥 讓所有前端即時更新
     return jsonify({"success": True, "message": "紀錄已刪除"}), 200
 
 
@@ -278,22 +336,6 @@ def detect_license_plate():
         return jsonify({"success": False, "message": str(e)}), 500
 
 
-@app.route('/get_parking_spaces', methods=['GET'])
-def get_parking_spaces():
-    spaces = ParkingSpace.query.all()
-    result = []
-    for space in spaces:
-        result.append({
-            'id': space.id,
-            'space_number': space.space_number,
-            'occupied': space.occupied,
-            'plate_number': space.plate_number,
-            'charging': space.charging,
-            'charging_cost': space.charging_cost,
-        })
-    return jsonify(result)
-
-
 @app.route('/toggle_occupied/<int:space_id>', methods=['POST'])
 def toggle_occupied(space_id):
     data = request.json
@@ -308,6 +350,18 @@ def toggle_occupied(space_id):
         # 釋放車位
         space.occupied = False
         space.plate_number = None
+
+        # 查找對應的進場紀錄並更新離場時間
+        record = ParkingRecord.query.filter_by(
+            plate_number=plate_number, exit_time=None).first()
+        if record:
+            record.exit_time = datetime.now()
+            duration = (record.exit_time -
+                        record.entry_time).total_seconds() / 3600  # 計算停車時長（小時）
+            record.fee = round(duration * 50, 2)  # 每小時 50 元
+            db.session.commit()
+        else:
+            return jsonify({"success": False, "message": "找不到進場紀錄，無法離場"}), 404
     else:
         # 佔用車位
         space.occupied = True
@@ -319,7 +373,8 @@ def toggle_occupied(space_id):
         db.session.add(new_record)
 
     db.session.commit()
-    notify_clients()  # 更新前端
+    notify_parking_spaces()
+    notify_parking_records()  # 通知前端車位狀態更新
     return jsonify({"success": True, "message": "車位狀態已更新"}), 200
 
 
@@ -328,6 +383,7 @@ def toggle_charging(space_id):
     space = ParkingSpace.query.get_or_404(space_id)
     space.charging = not space.charging
     db.session.commit()
+    notify_parking_spaces()  # 通知前端車位狀態更新
     return jsonify({'message': '充電服務已更新！'})
 
 
