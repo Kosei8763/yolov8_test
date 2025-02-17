@@ -63,52 +63,28 @@ function startContinuousRecognition() {
         })
     }, 3000) // 每 3 秒擷取一次影像
 }
+// 更新車位表格
+function updateParkingSpacesTable(spaces) {
+    const tableBody = $('#parking-spaces-table')
+    tableBody.empty() // 清空現有的表格內容
 
-// 進場請求
-function vehicleEntry() {
-    let plateNumber = $('#entry-plate').val()
-    if (!plateNumber) {
-        alert('請輸入車牌號碼！')
-        return
-    }
-
-    $.ajax({
-        url: '/entry',
-        method: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify({ plate_number: plateNumber }),
-        success: function (response) {
-            alert(response.message)
-            loadRecords() // 重新載入紀錄
-        },
-        error: function (response) {
-            alert(response.responseJSON.message)
-        },
-    })
-}
-
-// 離場請求
-function vehicleExit(recordId) {
-    if (recordId === undefined || recordId === null) {
-        alert('無效的記錄 ID！')
-        return
-    }
-    $.ajax({
-        url: '/exit/' + recordId,
-        method: 'POST',
-        success: function (response) {
-            // 檢查 response 和 response.record 是否存在
-            if (response && response.record) {
-                const fee = response.record.fee || '尚未計算' // 若 fee 不存在，顯示 '尚未計算'
-                alert('車輛已離場，停車費用：' + fee + ' 元')
-                loadRecords() // 重新載入紀錄
-            } else {
-                alert('無法獲取車輛資料或費用')
-            }
-        },
-        error: function () {
-            alert('離場失敗，請稍後再試！')
-        },
+    spaces.forEach((space) => {
+        const row = $('<tr></tr>')
+        row.append(`<td>${space.space_number}</td>`)
+        row.append(`<td>${space.occupied ? '已佔用' : '可用'}</td>`)
+        row.append(`<td>${space.plate_number || '無'}</td>`)
+        row.append(
+            `<td><button onclick="toggleCharging(${space.id}, ${space.charging})">${
+                space.charging ? '關閉充電' : '開啟充電'
+            }</button></td>`
+        )
+        row.append(`<td>${space.charging_cost} 元</td>`)
+        row.append(
+            `<td><button onclick="toggleOccupied(${space.id}, ${space.occupied})">${
+                space.occupied ? '釋放車位' : '佔用車位'
+            }</button></td>`
+        )
+        tableBody.append(row)
     })
 }
 
@@ -129,30 +105,6 @@ $(document).ready(function () {
         })
     }
 
-    // 更新車位表格
-    function updateParkingSpacesTable(spaces) {
-        const tableBody = $('#parking-spaces-table')
-        tableBody.empty() // 清空現有的表格內容
-
-        spaces.forEach((space) => {
-            const row = $('<tr></tr>')
-            row.append(`<td>${space.space_number}</td>`)
-            row.append(`<td>${space.occupied ? '已佔用' : '可用'}</td>`)
-            row.append(`<td>${space.plate_number || '無'}</td>`)
-            row.append(
-                `<td><button onclick="toggleCharging(${space.id}, ${space.charging})">${
-                    space.charging ? '關閉充電' : '開啟充電'
-                }</button></td>`
-            )
-            row.append(`<td>${space.charging_cost} 元</td>`)
-            row.append(
-                `<td><button onclick="toggleOccupied(${space.id}, ${space.occupied})">${
-                    space.occupied ? '釋放車位' : '佔用車位'
-                }</button></td>`
-            )
-            tableBody.append(row)
-        })
-    }
     function toggleOccupied(spaceId, isOccupied) {
         if (isOccupied) {
             // **釋放車位(離場)**: 發送離場請求給後端
@@ -204,7 +156,6 @@ $(document).ready(function () {
             spaceElement.removeClass('occupied')
         }
     }
-
     // 切換充電服務
     function toggleCharging(spaceId, isCharging) {
         $.ajax({
@@ -220,8 +171,7 @@ $(document).ready(function () {
         })
     }
 
-    // 註冊進場函數
-    window.vehicleEntry = vehicleEntry // 讓進場函數可以被 HTML 調用
+    // 註冊進場函數到全域變數，方便後續使用
     window.toggleOccupied = toggleOccupied
     window.toggleCharging = toggleCharging
 })
