@@ -256,6 +256,9 @@ def exit_parking(space_id):
     # 釋放車位
     space.occupied = False
     space.plate_number = None
+    space.charging = False  # 離場時關閉充電服務
+    space.charging_start_time = None
+    space.charging_cost = 0.0
     db.session.commit()
 
     # 通知前端更新
@@ -387,11 +390,37 @@ def toggle_occupied(space_id):
 @app.route('/toggle_charging/<int:space_id>', methods=['POST'])
 def toggle_charging(space_id):
     space = ParkingSpace.query.get_or_404(space_id)
+
+    # 切換充電狀態
     space.charging = not space.charging
+
+    # 如果開啟充電，設定充電開始時間
+    if space.charging and not space.charging_start_time:
+        space.charging_start_time = datetime.now()
+
+    # 如果關閉充電，計算充電費用
+    if not space.charging and space.charging_start_time:
+        update_charging_cost(space)  # 傳遞整個實例給 update_charging_cost
+        space.charging_start_time = None  # 充電結束，重設開始時間
+
     db.session.commit()
+
     notify_parking_records()
     notify_parking_spaces()  # 通知前端車位狀態更新
     return jsonify({"success": True, "message": "充電狀態已更新"}), 200
+
+
+def update_charging_cost(space):
+    # 檢查是否開啟充電
+    if space.charging_start_time:
+        # 計算充電時間（以小時為單位）
+        charging_duration = (
+            datetime.now() - space.charging_start_time).total_seconds() / 3600
+        # 假設每小時的充電費用是 10 元
+        cost_per_hour = 10.0
+        # 計算充電費用並更新
+        space.charging_cost += charging_duration * cost_per_hour
+        db.session.commit()  # 更新資料庫中的 charging_cost
 
 
 @app.route('/')
